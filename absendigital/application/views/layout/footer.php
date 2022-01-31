@@ -4,7 +4,7 @@
         <div class="container-fluid">
             <div class="d-flex align-items-center justify-content-between small">
                 <div class="text-muted">Copyright &copy; <?= date("Y"); ?><a href="<?= base_url(); ?>" class="ml-1"><?= $appname = (empty($dataapp['nama_app_absensi'])) ? 'Absensi Online' : $dataapp['nama_app_absensi']; ?></a>
-                    <div class="d-inline">Powered By<a href="https://github.com/sandyh90" class="ml-1">Pickedianz</a></div>
+                    <!--<div class="d-inline">Powered By<a href="https://github.com/sandyh90" class="ml-1">Pickedianz</a></div>-->
                 </div>
                 <div class="text-muted">
                     Page rendered in <strong>{elapsed_time}</strong> seconds.
@@ -101,14 +101,14 @@
             event.preventDefault();
         });
 
-
+        /*Jika Map digunakan maka jalankan script berikut*/    
         <?php if ($dataapp['maps_use'] == TRUE) : ?>
             let maps_absen = "searching...";
             if (document.getElementById("maps-absen")) {
                 window.onload = function() {
                     var popup = L.popup();
                     var geolocationMap = L.map("maps-absen", {
-                        center: [40.731701, -73.993411],
+                        center: [<?= $lokasi['gps'] ?>],
                         zoom: 15,
                     });
 
@@ -120,10 +120,28 @@
                         popup.setLatLng(latLng);
                         popup.setContent(
                             geolocationSupported ?
-                            "<b>Error:</b> The Geolocation service failed." :
-                            "<b>Error:</b> This browser doesn't support geolocation."
+                            "<b>Error:</b> Pengambilan lokasi gagal!" :
+                            "<b>Error:</b> Aktifkan GPS dan ijinkan browser mengakses lokasi anda."
                         );
                         popup.openOn(geolocationMap);
+                    }
+
+                    function getDistanceFromLatLonInMeter(lat1,lon1,lat2,lon2) {
+                      var R = 6371; // Radius of the earth in km
+                      var dLat = deg2rad(lat2-lat1);  // deg2rad below
+                      var dLon = deg2rad(lon2-lon1); 
+                      var a = 
+                        Math.sin(dLat/2) * Math.sin(dLat/2) +
+                        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+                        Math.sin(dLon/2) * Math.sin(dLon/2)
+                        ; 
+                      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+                      var d = R * c; // Distance in km
+                      return d*1000;
+                    }
+
+                    function deg2rad(deg) {
+                      return deg * (Math.PI/180)
                     }
 
                     if (navigator.geolocation) {
@@ -133,14 +151,21 @@
                                     lat: position.coords.latitude,
                                     lng: position.coords.longitude,
                                 };
-
                                 var marker = L.marker(latLng).addTo(geolocationMap);
                                 maps_absen = position.coords.latitude + ", " + position.coords.longitude;
+                                maps_jarak = getDistanceFromLatLonInMeter(<?= $lokasi['gps'] ?>,position.coords.latitude,position.coords.longitude);
                                 geolocationMap.setView(latLng);
+                                //alert(""+maps_absen+"");
+                                if (maps_jarak>55){
+                                    alert("Jarak dari titik pusat absensi : "+maps_jarak+" Meter. Mohon mendekat ke titik pusat absensi / kalibrasi GPS anda!!");
+                                    location.reload();
+                                }
+
                             },
                             function() {
                                 geolocationErrorOccurred(true, popup, geolocationMap.getCenter());
                                 maps_absen = 'No Location';
+                                //jarakErrorOccured(maps_jarak,popup);                        
                             }
                         );
                     } else {
@@ -159,13 +184,16 @@
             e.preventDefault(); // avoid to execute the actual submit of the form.
 
             let ket_absen = $('#ket_absen').val();
+            let maps_jarak= $('#maps_jarak').val();
+
 
             $.ajax({
                 type: "POST",
                 url: '<?= base_url('ajax/absenajax'); ?>',
                 data: {
                     maps_absen: maps_absen,
-                    ket_absen: ket_absen
+                    ket_absen: ket_absen,
+                    maps_jarak : maps_jarak
                 }, // serializes the form's elements.
                 dataType: 'json',
                 beforeSend: function() {
@@ -196,8 +224,6 @@
                     swal.fire("Absen Gagal", "Ada Kesalahan Saat Absen!", "error");
                 }
             });
-
-
         });
     </script>
     <!--Bagian CRUD Absen User-->
